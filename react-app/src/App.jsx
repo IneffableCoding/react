@@ -5,47 +5,66 @@ import JournalList from "./components/JournalList/JournalList";
 import Body from "./components/layout/Body/Body";
 import JournalAddButton from "./components/JournalAddButton/JournalAddButton";
 import JournalForm from "./components/JournalForm/JournalForm";
-import { useState } from "react";
+import { useLocalStorage } from './hooks/use-localstorage.hook';
+import { UserContextProvider } from './context/user.context';
+import { useContext, useState } from 'react';
+import { UserContext } from './context/user.context';
 
-const INITIAL_DATA = [
-  // {
-  //   id: 1,
-  //   title: "Подготовка к обновлению курсов",
-  //   text: "Горные походы открывают удивительный природный ланшафт",
-  //   date: new Date(),
-  // },
-  // {
-  //   id: 2,
-  //   title: "Поход в горы",
-  //   text: "Думал, что очень много времени",
-  //   date: new Date(),
-  // }
-]
+function mapItems(items) {
+  if (!items) {
+    return [];
+  }
+  return items.map(i => ({
+    ...i,
+    date: new Date(i.date)
+  }))
+}
 
 function App() {
-  const [items, setItems] = useState(INITIAL_DATA);
+  const [items, setItems] = useLocalStorage('date', []);
+  const { userId } = useContext(UserContext);
+  const [selectedItem, setSelectedItem] = useState({});
 
   const addItem = item => {
-    setItems(oldItems => [...oldItems, {
-      text: item.text,
-      title: item.title,
-      date: new Date(item.date),
-      id: oldItems.length > 0 ? Math.max(...oldItems.map(i => i.id)) + 1 : 1
-    }])
+    if (!item.id) {
+      setItems(prevItems => {
+        const safeItems = prevItems || [];
+        return [...mapItems(safeItems), {
+          ...item,
+          date: new Date(item.date),
+          id: safeItems.length > 0 ? Math.max(...safeItems.map(i => i.id)) + 1 : 1,
+          userId: userId
+        }];
+      });
+    }
+    else {
+      setItems([...mapItems(items).map(i => {
+        if (i.id === item.id) {
+          return {
+            ...item
+          }
+        }
+        return i;
+      })])
+    }
   }
 
   return (
-    <div className="app">
-      <LeftPanel>
-        <Header />
-        <JournalAddButton />
-        <JournalList items={items}>
-        </JournalList>
-      </LeftPanel>
-      <Body>
-        <JournalForm onSubmit={addItem} />
-      </Body>
-    </div>
+    <>
+      <UserContextProvider>
+        <div className="app">
+          <LeftPanel>
+            <Header />
+            <JournalAddButton />
+            <JournalList items={mapItems(items)} setItem={setSelectedItem}>
+            </JournalList>
+          </LeftPanel>
+          <Body>
+            <JournalForm onSubmit={addItem} data={selectedItem} />
+          </Body>
+        </div>
+      </UserContextProvider>
+    </>
   );
 }
 
